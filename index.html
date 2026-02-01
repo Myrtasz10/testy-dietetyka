@@ -11,6 +11,7 @@
         body {
             background-color: #f8f9fa;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overscroll-behavior-y: contain;
         }
         .container {
             max-width: 800px;
@@ -53,7 +54,7 @@
             transition: color 0.2s;
         }
         .fav-icon.active {
-            color: #ffc107; /* Złoty kolor */
+            color: #ffc107;
         }
         .stats-bar {
             font-size: 0.9rem;
@@ -67,21 +68,45 @@
         .hidden {
             display: none !important;
         }
+        .quiz-home-btn {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            font-size: 1.5rem;
+            color: #6c757d;
+            cursor: pointer;
+            z-index: 10;
+        }
+        .quiz-home-btn:hover {
+            color: #0d6efd;
+        }
     </style>
 </head>
 <body>
 
 <div class="container py-5">
-    
+
     <div id="start-screen" class="text-center fade-in">
-        <h1 class="mb-4 text-primary fw-bold"><i class="bi bi-journal-check"></i> Powtórka przed sprawdzianem</h1>
+        <h1 class="mb-4 text-primary fw-bold"><i class="bi bi-journal-check"></i> Powtórka</h1>
+
+        <div id="continue-section" class="card p-4 mb-4 border-primary hidden" style="border-width: 2px;">
+            <h5 class="text-primary mb-3">Wykryto zapisaną sesję</h5>
+            <p class="lead mb-3" id="continue-info">Pytanie 5 z 20</p>
+            <button id="continue-btn" class="btn btn-primary btn-lg w-100">
+                <i class="bi bi-play-circle"></i> Kontynuuj naukę
+            </button>
+            <button id="clear-save-btn" class="btn btn-outline-danger btn-sm mt-3">
+                Zignoruj i usuń zapis
+            </button>
+        </div>
+
         <div class="card p-5">
             <p class="lead">Wczytaj plik tekstowy z pytaniami, aby rozpocząć.</p>
             
             <div class="mb-3">
                 <input class="form-control form-control-lg" type="file" id="fileInput" accept=".txt">
             </div>
-            
+
             <div id="error-alert" class="alert alert-danger hidden text-start" role="alert">
                 <strong>Wystąpiły błędy podczas wczytywania pliku:</strong>
                 <ul id="error-log" class="mt-2 mb-0 ps-3"></ul>
@@ -89,17 +114,18 @@
         </div>
     </div>
 
-    <div id="quiz-screen" class="hidden">
-        <div class="d-flex justify-content-between align-items-center mb-2 stats-bar">
-            <span>Pytanie: <span id="current-q-num">1</span> / <span id="total-q-num">10</span></span>
+    <div id="quiz-screen" class="hidden position-relative">
+        <i id="quiz-home-btn" class="bi bi-house-door-fill quiz-home-btn" title="Wróć do menu (postęp zostanie zachowany)"></i>
+
+        <div class="d-flex justify-content-end align-items-center mb-2 stats-bar pt-1">
+            <span class="me-3">Pytanie: <span id="current-q-num">1</span> / <span id="total-q-num">10</span></span>
             <span>Skuteczność: <span id="accuracy" class="fw-bold">0%</span></span>
         </div>
         <div class="progress mb-4" style="height: 10px;">
             <div id="progress-bar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
         </div>
 
-        <div class="card p-4 mb-3 position-relative">
-            <div class="position-absolute top-0 end-0 p-3">
+        <div class="card p-4 mb-3 position-relative pt-5"> <div class="position-absolute top-0 end-0 p-3">
                 <i id="fav-btn" class="bi bi-star-fill fav-icon" title="Dodaj do ulubionych"></i>
             </div>
 
@@ -110,14 +136,14 @@
         </div>
 
         <div class="d-flex justify-content-end">
-            <button id="next-btn" class="btn btn-primary btn-lg px-5 hidden">Następne <i class="bi bi-arrow-right"></i></button>
+            <button id="next-btn" class="btn btn-primary btn-lg px-5 hidden">Następne<i class="bi bi-arrow-right"></i></button>
         </div>
     </div>
 
-<div id="summary-screen" class="hidden text-center">
+    <div id="summary-screen" class="hidden text-center">
         <div class="card p-5">
             <h2 class="mb-4">Koniec testu!</h2>
-            
+
             <div class="row justify-content-center mb-4">
                 <div class="col-md-4">
                     <div class="display-4 text-primary fw-bold" id="final-score">0%</div>
@@ -138,7 +164,7 @@
                 <button id="restart-btn" class="btn btn-outline-secondary btn-lg me-md-2 mb-2">
                     <i class="bi bi-house"></i> Strona główna
                 </button>
-                
+
                 <hr>
 
                 <button id="download-fav-btn" class="btn btn-warning text-white btn-lg me-md-2 mb-2 hidden">
@@ -164,12 +190,12 @@
 
 <script>
     // --- STAN APLIKACJI ---
-    let allQuestions = [];       // Wszystkie wczytane pytania
-    let currentQuiz = [];        // Pytania w bieżącej sesji
-    let currentIndex = 0;        // Indeks aktualnego pytania
-    let score = 0;               // Liczba poprawnych odpowiedzi
-    let favorites = new Set();   // Zbiór ID ulubionych pytań (używamy indeksu z oryginalnej tablicy jako ID)
-	let incorrects = new Set();  // Zbiór ID błędnych pytań (używamy indeksu z oryginalnej tablicy jako ID)
+    let allQuestions = [];
+    let currentQuiz = [];
+    let currentIndex = 0;
+    let score = 0;
+    let favorites = new Set();
+    let incorrects = new Set();
 
     // --- SELEKTORY DOM ---
     const screens = {
@@ -177,29 +203,113 @@
         quiz: document.getElementById('quiz-screen'),
         summary: document.getElementById('summary-screen')
     };
-    
+
     const ui = {
         fileInput: document.getElementById('fileInput'),
         errorAlert: document.getElementById('error-alert'),
         errorLog: document.getElementById('error-log'),
+
+        // Kontynuacja
+        continueSection: document.getElementById('continue-section'),
+        continueInfo: document.getElementById('continue-info'),
+        continueBtn: document.getElementById('continue-btn'),
+        clearSaveBtn: document.getElementById('clear-save-btn'),
+
         questionText: document.getElementById('question-text'),
         answersContainer: document.getElementById('answers-container'),
         currentQNum: document.getElementById('current-q-num'),
         totalQNum: document.getElementById('total-q-num'),
         accuracy: document.getElementById('accuracy'),
         progressBar: document.getElementById('progress-bar'),
+
         nextBtn: document.getElementById('next-btn'),
         favBtn: document.getElementById('fav-btn'),
+        quizHomeBtn: document.getElementById('quiz-home-btn'), // Nowy przycisk
+
         finalScore: document.getElementById('final-score'),
         favSummaryText: document.getElementById('fav-summary-text'),
-		wrongSummaryText: document.getElementById('wrong-summary-text'),
+        wrongSummaryText: document.getElementById('wrong-summary-text'),
+
         downloadFavBtn: document.getElementById('download-fav-btn'),
         startFavBtn: document.getElementById('start-fav-btn'),
-		downloadWrongBtn: document.getElementById('download-wrong-btn'),
+
+        downloadWrongBtn: document.getElementById('download-wrong-btn'),
         startWrongBtn: document.getElementById('start-wrong-btn'),
         wrongDivider: document.getElementById('wrong-divider'),
+
         restartBtn: document.getElementById('restart-btn')
     };
+
+    // --- START: SPRAWDZANIE ZAPISANEJ SESJI ---
+    window.addEventListener('DOMContentLoaded', checkSavedSession);
+
+    function checkSavedSession() {
+        const savedData = localStorage.getItem('quizAppState');
+        if (savedData) {
+            try {
+                const state = JSON.parse(savedData);
+                // Prosta walidacja czy dane mają sens
+                if (state.currentQuiz && state.currentQuiz.length > 0) {
+                    ui.continueSection.classList.remove('hidden');
+                    // Wyświetl info: Pytanie X z Y
+                    ui.continueInfo.innerText = `Pytanie ${state.currentIndex + 1} z ${state.currentQuiz.length}`;
+
+                    // Jeśli test zakończony (przypadek brzegowy), nie pokazuj kontynuacji
+                    if(state.currentIndex >= state.currentQuiz.length) {
+                         clearSave();
+                    }
+                }
+            } catch (e) {
+                console.error("Błąd odczytu zapisu", e);
+                clearSave();
+            }
+        } else {
+            ui.continueSection.classList.add('hidden');
+        }
+    }
+
+    ui.continueBtn.addEventListener('click', () => {
+        loadState();
+    });
+
+    ui.clearSaveBtn.addEventListener('click', () => {
+        clearSave();
+    });
+
+    function saveState() {
+        const state = {
+            allQuestions: allQuestions, // Potrzebne jeśli chcemy pobierać ulubione z pełnymi danymi
+            currentQuiz: currentQuiz,
+            currentIndex: currentIndex,
+            score: score,
+            // Set nie zapisuje się w JSON, musimy zamienić na Array
+            favorites: Array.from(favorites),
+            incorrects: Array.from(incorrects)
+        };
+        localStorage.setItem('quizAppState', JSON.stringify(state));
+    }
+
+    function loadState() {
+        const savedData = localStorage.getItem('quizAppState');
+        if (!savedData) return;
+
+        const state = JSON.parse(savedData);
+
+        allQuestions = state.allQuestions;
+        currentQuiz = state.currentQuiz;
+        currentIndex = state.currentIndex;
+        score = state.score;
+        favorites = new Set(state.favorites);
+        incorrects = new Set(state.incorrects);
+
+        showScreen('quiz');
+        renderQuestion();
+    }
+
+    function clearSave() {
+        localStorage.removeItem('quizAppState');
+        ui.continueSection.classList.add('hidden');
+    }
 
     // --- OBSŁUGA PLIKÓW I PARSOWANIE ---
 
@@ -215,47 +325,45 @@
         reader.readAsText(file);
     });
 
-	function parseFile(text) {
-        // Reset
+    function parseFile(text) {
+        // Resetowanie stanu przy nowym pliku
         allQuestions = [];
-        favorites.clear(); // <--- POPRAWKA: Czyścimy pamięć ulubionych przy wczytaniu nowego pliku
-		incorrects.clear();
+        favorites.clear();
+        incorrects.clear();
         ui.favBtn.classList.remove('active');
         ui.favBtn.classList.replace('bi-star-fill', 'bi-star');
-        
+
+        // Czyścimy ewentualny stary zapis, bo użytkownik ładuje nowy plik
+        clearSave();
+
         ui.errorAlert.classList.add('hidden');
         ui.errorLog.innerHTML = '';
         let errors = [];
 
-        // Dzielimy na bloki oddzielone pustymi liniami
         const rawBlocks = text.split(/\n\s*\n/);
-        
+
         rawBlocks.forEach((block, index) => {
             const lines = block.split('\n').map(l => l.trim()).filter(l => l !== '');
-            if (lines.length === 0) return; 
+            if (lines.length === 0) return;
 
-            let questionText = "";
-            let answers = [];
-            let correctAnswerIndex = -1;
-
-            // Pierwsza linia to pytanie
             if (lines.length < 5) {
-                errors.push(`Blok ${index + 1}: Za mało linii (oczekiwano pytania i 4 odpowiedzi).`);
+                errors.push(`Blok ${index + 1}: Za mało linii.`);
                 return;
             }
 
-            questionText = lines[0];
-
-            // Przetwarzanie odpowiedzi
+            let questionText = lines[0];
+            let answers = [];
             let answersFound = 0;
+            let correctAnswerIndex = -1;
+
             for (let i = 1; i < lines.length; i++) {
                 const line = lines[i];
                 const match = line.match(/^([a-dA-D])[\).]\s*(.*)/);
-                
+
                 if (match) {
                     let isCorrect = false;
-                    let ansText = match[0]; 
-                    
+                    let ansText = match[0];
+
                     if (ansText.toLowerCase().includes(" - prawidłowe")) {
                         isCorrect = true;
                         ansText = ansText.replace(/ - prawidłowe/i, "").trim();
@@ -273,9 +381,9 @@
             }
 
             if (answersFound !== 4) {
-                errors.push(`Blok ${index + 1} (Pytanie: "${questionText.substring(0, 20)}..."): Znaleziono ${answersFound} odpowiedzi zamiast 4.`);
+                errors.push(`Blok ${index + 1}: Znaleziono ${answersFound} odp. zamiast 4.`);
             } else if (correctAnswerIndex === -1) {
-                errors.push(`Blok ${index + 1} (Pytanie: "${questionText.substring(0, 20)}..."): Brak oznaczenia " - Prawidłowe".`);
+                errors.push(`Blok ${index + 1}: Brak oznaczenia "- Prawidłowe".`);
             } else {
                 allQuestions.push({
                     id: index,
@@ -292,24 +400,23 @@
                 li.innerText = err;
                 ui.errorLog.appendChild(li);
             });
-            
-            // POPRAWKA: Jeśli są błędy, przerywamy funkcję i NIE uruchamiamy quizu
-            return; 
+            return;
         }
 
-        // Jeśli nie ma błędów, startujemy
         startQuiz(allQuestions);
     }
 
     // --- LOGIKA QUIZU ---
 
     function startQuiz(questionsDataset) {
-		incorrects.clear()
-	
-        // Mieszamy pytania
+        incorrects.clear();
+
         currentQuiz = [...questionsDataset].sort(() => Math.random() - 0.5);
         currentIndex = 0;
         score = 0;
+
+        // Pierwszy zapis po rozpoczęciu
+        saveState();
 
         showScreen('quiz');
         renderQuestion();
@@ -320,24 +427,22 @@
             finishQuiz();
             return;
         }
-		
-		ui.nextBtn.classList.add('hidden'); // Ukryj przycisk dalej
+
+        // Ukrywamy przycisk dalej na starcie renderingu
+        ui.nextBtn.classList.add('hidden');
+        ui.answersContainer.innerHTML = '';
 
         const q = currentQuiz[currentIndex];
-        
-        // UI Updates
+
         ui.questionText.innerText = q.question;
         ui.currentQNum.innerText = currentIndex + 1;
         ui.totalQNum.innerText = currentQuiz.length;
-        
-        // Progress bar
+
         const progress = ((currentIndex) / currentQuiz.length) * 100;
         ui.progressBar.style.width = `${progress}%`;
 
-        // Skuteczność
         updateAccuracyDisplay();
 
-        // Gwiazdka ulubione
         if (favorites.has(q.id)) {
             ui.favBtn.classList.add('active');
             ui.favBtn.classList.replace('bi-star', 'bi-star-fill');
@@ -345,9 +450,6 @@
             ui.favBtn.classList.remove('active');
             ui.favBtn.classList.replace('bi-star-fill', 'bi-star');
         }
-
-        // Renderowanie odpowiedzi
-        ui.answersContainer.innerHTML = '';
 
         q.answers.forEach((ans, idx) => {
             const btn = document.createElement('button');
@@ -358,22 +460,17 @@
         });
     }
 
-	function handleAnswerClick(selectedBtn, answerObj, questionObj) {
-        // Blokujemy wszystkie przyciski
+    function handleAnswerClick(selectedBtn, answerObj, questionObj) {
         const buttons = ui.answersContainer.querySelectorAll('.btn-answer');
         buttons.forEach(b => b.disabled = true);
 
-        let isCorrect = answerObj.isCorrect;
-
-        if (isCorrect) {
+        if (answerObj.isCorrect) {
             selectedBtn.classList.add('correct');
             score++;
         } else {
             selectedBtn.classList.add('wrong');
-			
-			incorrects.add(questionObj.id);
-			
-            // Znajdź i podświetl prawidłową
+            incorrects.add(questionObj.id);
+
             questionObj.answers.forEach((ans, idx) => {
                 if (ans.isCorrect) {
                     buttons[idx].classList.add('correct');
@@ -381,23 +478,33 @@
             });
         }
 
-        // POPRAWKA: Najpierw pokazujemy przycisk, żeby updateAccuracyDisplay widział,
-        // że to pytanie jest już "zaliczone" do mianownika (liczby prób).
         ui.nextBtn.classList.remove('hidden');
-
-        // Dopiero teraz aktualizujemy procenty
         updateAccuracyDisplay();
+
+        // Zapis stanu po odpowiedzi (ważne, bo zmienił się wynik i ew. lista błędów)
+        saveState();
     }
 
     ui.nextBtn.addEventListener('click', () => {
         currentIndex++;
+        // Zapisujemy, że przeszliśmy do następnego (żeby po odświeżeniu być na nowym pytaniu)
+        saveState();
         renderQuestion();
     });
 
+    // Przycisk Home w quizie (tylko wychodzi, nie kasuje zapisu)
+    ui.quizHomeBtn.addEventListener('click', () => {
+        showScreen('start');
+        checkSavedSession(); // Odśwież widok przycisku kontynuuj
+        ui.fileInput.value = ''; // Czyścimy input pliku
+    });
+
     function updateAccuracyDisplay() {
-        let attempted = currentIndex + (ui.nextBtn.classList.contains('hidden') ? 0 : 1); 
-        // Jeśli przycisk next jest widoczny, to znaczy że już odpowiedzieliśmy na bieżące, więc wliczamy je do statystyk
-        
+        // Obliczamy na podstawie pytań ZAKOŃCZONYCH.
+        // Jeśli przycisk Next jest ukryty -> znaczy, że jeszcze nie odpowiedzieliśmy -> currentIndex pytań za nami
+        // Jeśli przycisk Next jest widoczny -> znaczy, że odpowiedzieliśmy -> currentIndex + 1 pytań za nami
+        let attempted = currentIndex + (ui.nextBtn.classList.contains('hidden') ? 0 : 1);
+
         if (attempted === 0) {
             ui.accuracy.innerText = "0%";
             return;
@@ -406,13 +513,15 @@
         ui.accuracy.innerText = `${perc}%`;
     }
 
-function finishQuiz() {
+    function finishQuiz() {
+        // Test zakończony -> usuwamy zapis
+        clearSave();
+
         showScreen('summary');
-        
+
         const perc = currentQuiz.length > 0 ? Math.round((score / currentQuiz.length) * 100) : 0;
         ui.finalScore.innerText = `${perc}%`;
 
-        // Logika ulubionych
         const favCount = favorites.size;
         ui.favSummaryText.innerText = `Ulubione: ${favCount}`;
         if (favCount > 0) {
@@ -423,10 +532,8 @@ function finishQuiz() {
             ui.startFavBtn.classList.add('hidden');
         }
 
-        // Logika błędnych
         const wrongCount = incorrects.size;
         ui.wrongSummaryText.innerText = `Błędne: ${wrongCount}`;
-        
         if (wrongCount > 0) {
             ui.downloadWrongBtn.classList.remove('hidden');
             ui.startWrongBtn.classList.remove('hidden');
@@ -449,33 +556,12 @@ function finishQuiz() {
             favorites.add(currentQ.id);
             ui.favBtn.classList.add('active');
         }
+        // Zapis stanu po dodaniu/usunięciu ulubionego
+        saveState();
     });
 
-	ui.downloadFavBtn.addEventListener('click', () => {
-        let content = "";
-        
-        allQuestions.forEach(q => {
-            if (favorites.has(q.id)) {
-                content += q.question + "\n";
-                q.answers.forEach(ans => {
-                    let line = ans.text;
-                    if (ans.isCorrect) {
-                        line += " - Prawidłowe";
-                    }
-
-                    content += line + "\n";
-                });
-                content += "\n"; 
-            }
-        });
-
-        // Generowanie daty do nazwy pliku
-        const now = new Date();
-        const dateStr = now.toLocaleDateString('pl-PL').replace(/\./g, '-'); // 31-01-2024
-        const timeStr = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }).replace(/:/g, '-'); // 14-30
-        const filename = `ulubione_${dateStr}_${timeStr}.txt`;
-
-        downloadFile(filename, content);
+    ui.downloadFavBtn.addEventListener('click', () => {
+        downloadQuestions(favorites, "ulubione");
     });
 
     ui.startFavBtn.addEventListener('click', () => {
@@ -483,10 +569,21 @@ function finishQuiz() {
         startQuiz(favQuestions);
     });
 
+    // --- OBSŁUGA BŁĘDNYCH ---
+
+    ui.downloadWrongBtn.addEventListener('click', () => {
+        downloadQuestions(incorrects, "bledne");
+    });
+
+    ui.startWrongBtn.addEventListener('click', () => {
+        const wrongQuestions = allQuestions.filter(q => incorrects.has(q.id));
+        startQuiz(wrongQuestions);
+    });
+
     ui.restartBtn.addEventListener('click', () => {
-        // Reset formularza pliku
         ui.fileInput.value = '';
         showScreen('start');
+        checkSavedSession();
     });
 
     // --- POMOCNICZE ---
@@ -496,60 +593,46 @@ function finishQuiz() {
         screens[screenName].classList.remove('hidden');
     }
 
-    function downloadFile(filename, text) {
-        const element = document.createElement('a');
-        element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
-        element.setAttribute('download', filename);
-
-        element.style.display = 'none';
-        document.body.appendChild(element);
-
-        element.click();
-
-        document.body.removeChild(element);
-    }
-	
-	// --- OBSŁUGA KLAWIATURY (ENTER / SPACJA) ---
-    document.addEventListener('keydown', (e) => {
-        // Sprawdzamy czy wciśnięto Enter lub Spację
-        if (e.key === 'Enter' || e.key === ' ') {
-            // Sprawdzamy czy jesteśmy na ekranie quizu i czy przycisk Dalej jest widoczny
-            if (!ui.nextBtn.classList.contains('hidden')) {
-                e.preventDefault(); // Zapobiega przewijaniu strony spacją
-                ui.nextBtn.click(); // Symuluje kliknięcie
-            }
-        }
-    });
-	
-	ui.startWrongBtn.addEventListener('click', () => {
-        // Filtrujemy tylko te, które są w zbiorze incorrects
-        const wrongQuestions = allQuestions.filter(q => incorrects.has(q.id));
-        startQuiz(wrongQuestions);
-    });
-
-    ui.downloadWrongBtn.addEventListener('click', () => {
+    function downloadQuestions(idSet, prefixName) {
         let content = "";
-        
         allQuestions.forEach(q => {
-            if (incorrects.has(q.id)) {
+            if (idSet.has(q.id)) {
                 content += q.question + "\n";
                 q.answers.forEach(ans => {
                     let line = ans.text;
-                    if (ans.isCorrect) {
-                        line += " - Prawidłowe";
-                    }
+                    if (ans.isCorrect) line += " - Prawidłowe";
                     content += line + "\n";
                 });
-                content += "\n"; 
+                content += "\n";
             }
         });
 
         const now = new Date();
         const dateStr = now.toLocaleDateString('pl-PL').replace(/\./g, '-');
         const timeStr = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }).replace(/:/g, '-');
-        const filename = `bledne_${dateStr}_${timeStr}.txt`;
+        const filename = `${prefixName}_${dateStr}_${timeStr}.txt`;
 
         downloadFile(filename, content);
+    }
+
+    function downloadFile(filename, text) {
+        const element = document.createElement('a');
+        element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+        element.setAttribute('download', filename);
+        element.style.display = 'none';
+        document.body.appendChild(element);
+        element.click();
+        document.body.removeChild(element);
+    }
+
+    // --- OBSŁUGA KLAWIATURY ---
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            if (!ui.nextBtn.classList.contains('hidden') && !screens.quiz.classList.contains('hidden')) {
+                e.preventDefault();
+                ui.nextBtn.click();
+            }
+        }
     });
 </script>
 
