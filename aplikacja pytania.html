@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikacja Powtórkowa</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .container {
+            max-width: 800px;
+        }
+        .card {
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border: none;
+        }
+        .btn-answer {
+            text-align: left;
+            white-space: normal;
+            transition: all 0.2s;
+            border: 1px solid #dee2e6;
+            background-color: white;
+            color: #212529;
+            margin-bottom: 10px;
+            padding: 15px;
+            border-radius: 10px;
+            width: 100%;
+        }
+        .btn-answer:hover:not(:disabled) {
+            background-color: #e9ecef;
+            transform: translateY(-2px);
+        }
+        .btn-answer.correct {
+            background-color: #d1e7dd !important;
+            border-color: #badbcc !important;
+            color: #0f5132 !important;
+        }
+        .btn-answer.wrong {
+            background-color: #f8d7da !important;
+            border-color: #f5c2c7 !important;
+            color: #842029 !important;
+        }
+        .fav-icon {
+            cursor: pointer;
+            font-size: 1.5rem;
+            color: #ccc;
+            transition: color 0.2s;
+        }
+        .fav-icon.active {
+            color: #ffc107; /* Złoty kolor */
+        }
+        .stats-bar {
+            font-size: 0.9rem;
+            color: #6c757d;
+        }
+        #error-log {
+            max-height: 200px;
+            overflow-y: auto;
+            font-size: 0.85rem;
+        }
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container py-5">
+    
+    <div id="start-screen" class="text-center fade-in">
+        <h1 class="mb-4 text-primary fw-bold"><i class="bi bi-journal-check"></i> Powtórka przed sprawdzianem</h1>
+        <div class="card p-5">
+            <p class="lead">Wczytaj plik tekstowy z pytaniami, aby rozpocząć.</p>
+            
+            <div class="mb-3">
+                <input class="form-control form-control-lg" type="file" id="fileInput" accept=".txt">
+            </div>
+            
+            <div id="error-alert" class="alert alert-danger hidden text-start" role="alert">
+                <strong>Wystąpiły błędy podczas wczytywania pliku:</strong>
+                <ul id="error-log" class="mt-2 mb-0 ps-3"></ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="quiz-screen" class="hidden">
+        <div class="d-flex justify-content-between align-items-center mb-2 stats-bar">
+            <span>Pytanie: <span id="current-q-num">1</span> / <span id="total-q-num">10</span></span>
+            <span>Skuteczność: <span id="accuracy" class="fw-bold">0%</span></span>
+        </div>
+        <div class="progress mb-4" style="height: 10px;">
+            <div id="progress-bar" class="progress-bar bg-primary" role="progressbar" style="width: 0%"></div>
+        </div>
+
+        <div class="card p-4 mb-3 position-relative">
+            <div class="position-absolute top-0 end-0 p-3">
+                <i id="fav-btn" class="bi bi-star-fill fav-icon" title="Dodaj do ulubionych"></i>
+            </div>
+
+            <h4 id="question-text" class="mb-4 pe-4">Treść pytania...</h4>
+
+            <div id="answers-container" class="d-grid gap-2">
+                </div>
+        </div>
+
+        <div class="d-flex justify-content-end">
+            <button id="next-btn" class="btn btn-primary btn-lg px-5 hidden">Następne <i class="bi bi-arrow-right"></i></button>
+        </div>
+    </div>
+
+<div id="summary-screen" class="hidden text-center">
+        <div class="card p-5">
+            <h2 class="mb-4">Koniec testu!</h2>
+            
+            <div class="row justify-content-center mb-4">
+                <div class="col-md-4">
+                    <div class="display-4 text-primary fw-bold" id="final-score">0%</div>
+                    <p class="text-muted">Skuteczność</p>
+                </div>
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <p id="fav-summary-text" class="text-warning fw-bold">Ulubione: 0</p>
+                </div>
+                <div class="col-md-6">
+                    <p id="wrong-summary-text" class="text-danger fw-bold">Błędne: 0</p>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 d-md-block">
+                <button id="restart-btn" class="btn btn-outline-secondary btn-lg me-md-2 mb-2">
+                    <i class="bi bi-house"></i> Strona główna
+                </button>
+                
+                <hr>
+
+                <button id="download-fav-btn" class="btn btn-warning text-white btn-lg me-md-2 mb-2 hidden">
+                    <i class="bi bi-download"></i> Pobierz ulubione
+                </button>
+                <button id="start-fav-btn" class="btn btn-outline-warning btn-lg me-md-2 mb-2 hidden">
+                    <i class="bi bi-star-fill"></i> Rozwiąż ulubione
+                </button>
+
+                <hr id="wrong-divider" class="hidden">
+
+                <button id="download-wrong-btn" class="btn btn-danger btn-lg me-md-2 mb-2 hidden">
+                    <i class="bi bi-download"></i> Pobierz błędne
+                </button>
+                <button id="start-wrong-btn" class="btn btn-outline-danger btn-lg me-md-2 mb-2 hidden">
+                    <i class="bi bi-arrow-repeat"></i> Popraw błędne
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // --- STAN APLIKACJI ---
+    let allQuestions = [];       // Wszystkie wczytane pytania
+    let currentQuiz = [];        // Pytania w bieżącej sesji
+    let currentIndex = 0;        // Indeks aktualnego pytania
+    let score = 0;               // Liczba poprawnych odpowiedzi
+    let favorites = new Set();   // Zbiór ID ulubionych pytań (używamy indeksu z oryginalnej tablicy jako ID)
+	let incorrects = new Set();  // Zbiór ID błędnych pytań (używamy indeksu z oryginalnej tablicy jako ID)
+
+    // --- SELEKTORY DOM ---
+    const screens = {
+        start: document.getElementById('start-screen'),
+        quiz: document.getElementById('quiz-screen'),
+        summary: document.getElementById('summary-screen')
+    };
+    
+    const ui = {
+        fileInput: document.getElementById('fileInput'),
+        errorAlert: document.getElementById('error-alert'),
+        errorLog: document.getElementById('error-log'),
+        questionText: document.getElementById('question-text'),
+        answersContainer: document.getElementById('answers-container'),
+        currentQNum: document.getElementById('current-q-num'),
+        totalQNum: document.getElementById('total-q-num'),
+        accuracy: document.getElementById('accuracy'),
+        progressBar: document.getElementById('progress-bar'),
+        nextBtn: document.getElementById('next-btn'),
+        favBtn: document.getElementById('fav-btn'),
+        finalScore: document.getElementById('final-score'),
+        favSummaryText: document.getElementById('fav-summary-text'),
+		wrongSummaryText: document.getElementById('wrong-summary-text'),
+        downloadFavBtn: document.getElementById('download-fav-btn'),
+        startFavBtn: document.getElementById('start-fav-btn'),
+		downloadWrongBtn: document.getElementById('download-wrong-btn'),
+        startWrongBtn: document.getElementById('start-wrong-btn'),
+        wrongDivider: document.getElementById('wrong-divider'),
+        restartBtn: document.getElementById('restart-btn')
+    };
+
+    // --- OBSŁUGA PLIKÓW I PARSOWANIE ---
+
+    ui.fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const content = e.target.result;
+            parseFile(content);
+        };
+        reader.readAsText(file);
+    });
+
+	function parseFile(text) {
+        // Reset
+        allQuestions = [];
+        favorites.clear(); // <--- POPRAWKA: Czyścimy pamięć ulubionych przy wczytaniu nowego pliku
+		incorrects.clear();
+        ui.favBtn.classList.remove('active');
+        ui.favBtn.classList.replace('bi-star-fill', 'bi-star');
+        
+        ui.errorAlert.classList.add('hidden');
+        ui.errorLog.innerHTML = '';
+        let errors = [];
+
+        // Dzielimy na bloki oddzielone pustymi liniami
+        const rawBlocks = text.split(/\n\s*\n/);
+        
+        rawBlocks.forEach((block, index) => {
+            const lines = block.split('\n').map(l => l.trim()).filter(l => l !== '');
+            if (lines.length === 0) return; 
+
+            let questionText = "";
+            let answers = [];
+            let correctAnswerIndex = -1;
+
+            // Pierwsza linia to pytanie
+            if (lines.length < 5) {
+                errors.push(`Blok ${index + 1}: Za mało linii (oczekiwano pytania i 4 odpowiedzi).`);
+                return;
+            }
+
+            questionText = lines[0];
+
+            // Przetwarzanie odpowiedzi
+            let answersFound = 0;
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i];
+                const match = line.match(/^([a-dA-D])[\).]\s*(.*)/);
+                
+                if (match) {
+                    let isCorrect = false;
+                    let ansText = match[0]; 
+                    
+                    if (ansText.toLowerCase().includes(" - prawidłowe")) {
+                        isCorrect = true;
+                        ansText = ansText.replace(/ - prawidłowe/i, "").trim();
+                    }
+
+                    answers.push({
+                        text: ansText,
+                        isCorrect: isCorrect,
+                        originalLine: line
+                    });
+
+                    if (isCorrect) correctAnswerIndex = answers.length - 1;
+                    answersFound++;
+                }
+            }
+
+            if (answersFound !== 4) {
+                errors.push(`Blok ${index + 1} (Pytanie: "${questionText.substring(0, 20)}..."): Znaleziono ${answersFound} odpowiedzi zamiast 4.`);
+            } else if (correctAnswerIndex === -1) {
+                errors.push(`Blok ${index + 1} (Pytanie: "${questionText.substring(0, 20)}..."): Brak oznaczenia " - Prawidłowe".`);
+            } else {
+                allQuestions.push({
+                    id: index,
+                    question: questionText,
+                    answers: answers
+                });
+            }
+        });
+
+        if (errors.length > 0) {
+            ui.errorAlert.classList.remove('hidden');
+            errors.forEach(err => {
+                const li = document.createElement('li');
+                li.innerText = err;
+                ui.errorLog.appendChild(li);
+            });
+            
+            // POPRAWKA: Jeśli są błędy, przerywamy funkcję i NIE uruchamiamy quizu
+            return; 
+        }
+
+        // Jeśli nie ma błędów, startujemy
+        startQuiz(allQuestions);
+    }
+
+    // --- LOGIKA QUIZU ---
+
+    function startQuiz(questionsDataset) {
+		incorrects.clear()
+	
+        // Mieszamy pytania
+        currentQuiz = [...questionsDataset].sort(() => Math.random() - 0.5);
+        currentIndex = 0;
+        score = 0;
+
+        showScreen('quiz');
+        renderQuestion();
+    }
+
+    function renderQuestion() {
+        if (currentIndex >= currentQuiz.length) {
+            finishQuiz();
+            return;
+        }
+		
+		ui.nextBtn.classList.add('hidden'); // Ukryj przycisk dalej
+
+        const q = currentQuiz[currentIndex];
+        
+        // UI Updates
+        ui.questionText.innerText = q.question;
+        ui.currentQNum.innerText = currentIndex + 1;
+        ui.totalQNum.innerText = currentQuiz.length;
+        
+        // Progress bar
+        const progress = ((currentIndex) / currentQuiz.length) * 100;
+        ui.progressBar.style.width = `${progress}%`;
+
+        // Skuteczność
+        updateAccuracyDisplay();
+
+        // Gwiazdka ulubione
+        if (favorites.has(q.id)) {
+            ui.favBtn.classList.add('active');
+            ui.favBtn.classList.replace('bi-star', 'bi-star-fill');
+        } else {
+            ui.favBtn.classList.remove('active');
+            ui.favBtn.classList.replace('bi-star-fill', 'bi-star');
+        }
+
+        // Renderowanie odpowiedzi
+        ui.answersContainer.innerHTML = '';
+
+        q.answers.forEach((ans, idx) => {
+            const btn = document.createElement('button');
+            btn.className = 'btn-answer';
+            btn.innerText = ans.text;
+            btn.onclick = () => handleAnswerClick(btn, ans, q);
+            ui.answersContainer.appendChild(btn);
+        });
+    }
+
+	function handleAnswerClick(selectedBtn, answerObj, questionObj) {
+        // Blokujemy wszystkie przyciski
+        const buttons = ui.answersContainer.querySelectorAll('.btn-answer');
+        buttons.forEach(b => b.disabled = true);
+
+        let isCorrect = answerObj.isCorrect;
+
+        if (isCorrect) {
+            selectedBtn.classList.add('correct');
+            score++;
+        } else {
+            selectedBtn.classList.add('wrong');
+			
+			incorrects.add(questionObj.id);
+			
+            // Znajdź i podświetl prawidłową
+            questionObj.answers.forEach((ans, idx) => {
+                if (ans.isCorrect) {
+                    buttons[idx].classList.add('correct');
+                }
+            });
+        }
+
+        // POPRAWKA: Najpierw pokazujemy przycisk, żeby updateAccuracyDisplay widział,
+        // że to pytanie jest już "zaliczone" do mianownika (liczby prób).
+        ui.nextBtn.classList.remove('hidden');
+
+        // Dopiero teraz aktualizujemy procenty
+        updateAccuracyDisplay();
+    }
+
+    ui.nextBtn.addEventListener('click', () => {
+        currentIndex++;
+        renderQuestion();
+    });
+
+    function updateAccuracyDisplay() {
+        let attempted = currentIndex + (ui.nextBtn.classList.contains('hidden') ? 0 : 1); 
+        // Jeśli przycisk next jest widoczny, to znaczy że już odpowiedzieliśmy na bieżące, więc wliczamy je do statystyk
+        
+        if (attempted === 0) {
+            ui.accuracy.innerText = "0%";
+            return;
+        }
+        const perc = Math.round((score / attempted) * 100);
+        ui.accuracy.innerText = `${perc}%`;
+    }
+
+function finishQuiz() {
+        showScreen('summary');
+        
+        const perc = currentQuiz.length > 0 ? Math.round((score / currentQuiz.length) * 100) : 0;
+        ui.finalScore.innerText = `${perc}%`;
+
+        // Logika ulubionych
+        const favCount = favorites.size;
+        ui.favSummaryText.innerText = `Ulubione: ${favCount}`;
+        if (favCount > 0) {
+            ui.downloadFavBtn.classList.remove('hidden');
+            ui.startFavBtn.classList.remove('hidden');
+        } else {
+            ui.downloadFavBtn.classList.add('hidden');
+            ui.startFavBtn.classList.add('hidden');
+        }
+
+        // Logika błędnych
+        const wrongCount = incorrects.size;
+        ui.wrongSummaryText.innerText = `Błędne: ${wrongCount}`;
+        
+        if (wrongCount > 0) {
+            ui.downloadWrongBtn.classList.remove('hidden');
+            ui.startWrongBtn.classList.remove('hidden');
+            ui.wrongDivider.classList.remove('hidden');
+        } else {
+            ui.downloadWrongBtn.classList.add('hidden');
+            ui.startWrongBtn.classList.add('hidden');
+            ui.wrongDivider.classList.add('hidden');
+        }
+    }
+
+    // --- OBSŁUGA ULUBIONYCH ---
+
+    ui.favBtn.addEventListener('click', () => {
+        const currentQ = currentQuiz[currentIndex];
+        if (favorites.has(currentQ.id)) {
+            favorites.delete(currentQ.id);
+            ui.favBtn.classList.remove('active');
+        } else {
+            favorites.add(currentQ.id);
+            ui.favBtn.classList.add('active');
+        }
+    });
+
+	ui.downloadFavBtn.addEventListener('click', () => {
+        let content = "";
+        
+        allQuestions.forEach(q => {
+            if (favorites.has(q.id)) {
+                content += q.question + "\n";
+                q.answers.forEach(ans => {
+                    let line = ans.text;
+                    if (ans.isCorrect) {
+                        line += " - Prawidłowe";
+                    }
+
+                    content += line + "\n";
+                });
+                content += "\n"; 
+            }
+        });
+
+        // Generowanie daty do nazwy pliku
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('pl-PL').replace(/\./g, '-'); // 31-01-2024
+        const timeStr = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }).replace(/:/g, '-'); // 14-30
+        const filename = `ulubione_${dateStr}_${timeStr}.txt`;
+
+        downloadFile(filename, content);
+    });
+
+    ui.startFavBtn.addEventListener('click', () => {
+        const favQuestions = allQuestions.filter(q => favorites.has(q.id));
+        startQuiz(favQuestions);
+    });
+
+    ui.restartBtn.addEventListener('click', () => {
+        // Reset formularza pliku
+        ui.fileInput.value = '';
+        showScreen('start');
+    });
+
+    // --- POMOCNICZE ---
+
+    function showScreen(screenName) {
+        Object.values(screens).forEach(s => s.classList.add('hidden'));
+        screens[screenName].classList.remove('hidden');
+    }
+
+    function downloadFile(filename, text) {
+        const element = document.createElement('a');
+        element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+        element.setAttribute('download', filename);
+
+        element.style.display = 'none';
+        document.body.appendChild(element);
+
+        element.click();
+
+        document.body.removeChild(element);
+    }
+	
+	// --- OBSŁUGA KLAWIATURY (ENTER / SPACJA) ---
+    document.addEventListener('keydown', (e) => {
+        // Sprawdzamy czy wciśnięto Enter lub Spację
+        if (e.key === 'Enter' || e.key === ' ') {
+            // Sprawdzamy czy jesteśmy na ekranie quizu i czy przycisk Dalej jest widoczny
+            if (!ui.nextBtn.classList.contains('hidden')) {
+                e.preventDefault(); // Zapobiega przewijaniu strony spacją
+                ui.nextBtn.click(); // Symuluje kliknięcie
+            }
+        }
+    });
+	
+	ui.startWrongBtn.addEventListener('click', () => {
+        // Filtrujemy tylko te, które są w zbiorze incorrects
+        const wrongQuestions = allQuestions.filter(q => incorrects.has(q.id));
+        startQuiz(wrongQuestions);
+    });
+
+    ui.downloadWrongBtn.addEventListener('click', () => {
+        let content = "";
+        
+        allQuestions.forEach(q => {
+            if (incorrects.has(q.id)) {
+                content += q.question + "\n";
+                q.answers.forEach(ans => {
+                    let line = ans.text;
+                    if (ans.isCorrect) {
+                        line += " - Prawidłowe";
+                    }
+                    content += line + "\n";
+                });
+                content += "\n"; 
+            }
+        });
+
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('pl-PL').replace(/\./g, '-');
+        const timeStr = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }).replace(/:/g, '-');
+        const filename = `bledne_${dateStr}_${timeStr}.txt`;
+
+        downloadFile(filename, content);
+    });
+</script>
+
+</body>
+</html>
