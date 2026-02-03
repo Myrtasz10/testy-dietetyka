@@ -343,7 +343,6 @@
         ui.favBtn.classList.remove('active');
         ui.favBtn.classList.replace('bi-star-fill', 'bi-star');
 
-        // Czyścimy ewentualny stary zapis, bo użytkownik ładuje nowy plik
         clearSave();
 
         ui.errorAlert.classList.add('hidden');
@@ -366,7 +365,10 @@
             let answersFound = 0;
             let correctAnswerIndex = -1;
 
-            for (let i = 1; i < lines.length; i++) {
+            // 1. Przetwarzanie odpowiedzi (Linie 1-4)
+            // Zakładamy, że odpowiedzi to zawsze kolejne 4 linie po pytaniu
+            // Ograniczamy pętlę do 4 odpowiedzi, żeby nie wczytać linii z kluczem jako odpowiedzi E
+            for (let i = 1; i < lines.length && i <= 4; i++) {
                 const line = lines[i];
                 const match = line.match(/^([a-dA-D])[\).]\s*(.*)/);
 
@@ -374,27 +376,55 @@
                     let isCorrect = false;
                     let ansText = match[0];
 
+                    // METODA 1: Szukanie "- Prawidłowe" w treści odpowiedzi
                     if (ansText.toLowerCase().includes(" - prawidłowe")) {
                         isCorrect = true;
                         ansText = ansText.replace(/ - prawidłowe/i, "").trim();
+                        correctAnswerIndex = answers.length; // Zapisujemy indeks bieżącej
                     }
 
                     answers.push({
                         text: ansText,
                         isCorrect: isCorrect,
-                        originalLine: line
+                        originalLine: line // Zachowujemy oryginał
                     });
 
-                    if (isCorrect) correctAnswerIndex = answers.length - 1;
                     answersFound++;
                 }
             }
 
+            // METODA 2: Sprawdzanie osobnej linii z kluczem odpowiedzi (np. "Odp: A")
+            // Uruchamiamy tylko, jeśli Metoda 1 nie znalazła wyniku i mamy dodatkową linię (6-tą)
+            if (correctAnswerIndex === -1 && lines.length >= 6) {
+                // Pobieramy 6. linię (indeks 5)
+                const keyLine = lines[5].trim();
+
+                // Bierzemy OSTATNI znak tej linii (np. z "Answer: A" weźmie "A")
+                const lastChar = keyLine.slice(-1).toUpperCase();
+
+                // Mapujemy literę na indeks tablicy (0-3)
+                const charMap = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
+
+                if (charMap.hasOwnProperty(lastChar)) {
+                    correctAnswerIndex = charMap[lastChar];
+
+                    // Oznaczamy odpowiedź w naszej tablicy jako poprawną
+                    // Sprawdzamy czy ta odpowiedź istnieje (czy parsowanie wyżej zadziałało)
+                    if (answers[correctAnswerIndex]) {
+                        answers[correctAnswerIndex].isCorrect = true;
+                        // Aktualizujemy originalLine, żeby przy pobieraniu ulubionych/błędnych wiedzieć że to ta
+                        // (Opcjonalne, ale pomocne przy eksporcie - chociaż eksport i tak dodaje "- Prawidłowe")
+                    }
+                }
+            }
+
+            // WALIDACJA KOŃCOWA BLOKU
             if (answersFound !== 4) {
-                errors.push(`Blok ${index + 1}: Znaleziono ${answersFound} odp. zamiast 4.`);
+                errors.push(`Blok ${index + 1}: Znaleziono ${answersFound} odp. zamiast 4 (sprawdź format A/B/C/D).`);
             } else if (correctAnswerIndex === -1) {
-                errors.push(`Blok ${index + 1}: Brak oznaczenia "- Prawidłowe".`);
+                errors.push(`Blok ${index + 1} (Pytanie: "${questionText.substring(0, 15)}..."): Nie wykryto poprawnej odpowiedzi.`);
             } else {
+                // Sukces
                 allQuestions.push({
                     id: index,
                     question: questionText,
