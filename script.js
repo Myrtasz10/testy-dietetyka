@@ -176,9 +176,9 @@ function parseFile(text) {
                 let ansText = match[0];
 
                 // METODA 1: Szukanie "- Prawidłowe" w treści odpowiedzi
-                if (ansText.toLowerCase().includes(" - prawidłowe")) {
+                if (ansText.toLowerCase().includes(" - prawidłowe") || ansText.toLowerCase().includes(" - prawidłowa")) {
                     isCorrect = true;
-                    ansText = ansText.replace(/ - prawidłowe/i, "").trim();
+                    ansText = ansText.replace(/ - prawidłowe/i, "").replace(/ - prawidłowa/i, "").trim();
                     correctAnswerIndex = answers.length; // Zapisujemy indeks bieżącej
                 }
 
